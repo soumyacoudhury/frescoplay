@@ -1,0 +1,854 @@
+
+ITEM
+----
+
+SELECT ITEMNUMBER,
+  COMPANYREFERENCE,
+  PRODUCTSTATUS,
+  LOCALE,
+  DESCRIPTION,
+  OBJECTTYPE,
+  PRODUCTGROUPCODE,
+  SERIALCONTROLLED,
+  IBASETRACEABLEITEM,
+  COLLECTABLEITEM,
+  CROSSSOLDCODE,
+  STOCKUOM,
+  BUSINESSGROUPCODE,
+  ENTITLEMENT_CLASSIFICATION,
+  ENTITLEMENT_SUBCLASSIFICATION as ENTITLEMENT_SUB,
+  MERCHANDISECLASS,
+  CEMISPRODUCTGROUP
+FROM
+  (SELECT item.segment1 Itemnumber,
+    'MASTER' CompanyReference,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'LIFECYCLESTAGE'
+    AND mdm_value           = plc.c_ext_attr1
+    ) ProductStatus,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'LANGUAGECODE'
+    AND mdm_value           = item_lang.c_ext_attr1
+    ) Locale,
+    item_lang.c_ext_attr2 Description,
+    NVL(
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'CATALOGUEGROUPNAME'
+    AND mdm_value           = micg.catalog_group
+    ), 'ItemObjectType') ObjectType,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'PRODUCTSERVICESALESTYPE'
+    AND mdm_value           = pr_gro.c_ext_attr38
+    ) ProductGroupCode,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr4, 'N')
+    ) SerialControlled,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr7, 'N')
+    ) IBaseTraceableItem,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr12, 'N')
+    ) CollectableItem,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr5, 'N')
+    ) CrossSoldCode,
+    (SELECT TRIM (pc_value) AS pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'PRIMARYUOMCODE'
+    AND mdm_value           = item.primary_uom_code
+    ) StockUOM,
+    pr_gro.attribute5 BusinessGroupCode,
+    CASE
+      WHEN micg.CATALOG_GROUP = 'SERVICE ENTITLEMENT'
+      THEN
+        (SELECT
+          (SELECT pc_value
+          FROM XXAM_XREF
+          WHERE cr_attribute_name = 'ENTITLEMENTCLASS'
+          AND mdm_value           = agv.XXCNN_ENTITLEMENTS_CATEGORY
+          )
+        FROM apps.EGO_XXCNN_SERVIC_ENT_AGV agv
+        WHERE agv.inventory_item_id = item.inventory_item_id
+        AND agv.organization_id     = item.organization_id
+        )
+    END Entitlement_Classification,
+    CASE
+      WHEN micg.CATALOG_GROUP = 'SERVICE ENTITLEMENT'
+      THEN
+        (SELECT
+          (SELECT pc_value
+          FROM XXAM_XREF
+          WHERE cr_attribute_name = 'ENTITLEMENTSUBCLASS'
+          AND mdm_value           = agv.XXCNN_SUBENTITLEMENT_CATEGORY
+          )
+        FROM apps.EGO_XXCNN_SERVIC_ENT_AGV agv
+        WHERE agv.inventory_item_id = item.inventory_item_id
+        AND agv.organization_id     = item.organization_id
+        )
+    END Entitlement_SubClassification,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'MERCHANDISECLASS'
+    AND mdm_value           = mrch.mclass
+    ) MerchandiseClass,
+    (SELECT
+      (SELECT pc_value
+      FROM XXAM_XREF
+      WHERE cr_attribute_name = 'CEMISPRODUCTGROUP'
+      AND mdm_value           = agv.CEM_N
+      )
+    FROM apps.EGO_PR_GRO_AGV agv
+    WHERE agv.inventory_item_id = item.inventory_item_id
+    AND agv.organization_id     = item.organization_id
+    ) CemisProductGroup
+  FROM
+    (SELECT item_lang.inventory_item_id,
+      item_lang.organization_id,
+      item_lang.c_ext_attr1,
+      item_lang.c_ext_attr2
+    FROM apps.ego_mtl_sy_items_ext_b item_lang,
+      apps.ego_attr_groups_v item_lang_gr,
+      apps.ego_data_level_b item_lang_dl
+    WHERE item_lang.attr_group_id    = item_lang_gr.attr_group_id
+    AND item_lang_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND item_lang_gr.application_id  = 431
+    AND item_lang_gr.attr_group_name = 'XXCNN_MERCH_NAME_FULL'
+    AND item_lang.data_level_id      = item_lang_dl.data_level_id
+    AND item_lang_dl.attr_group_type = item_lang_gr.attr_group_type
+    AND item_lang_dl.data_level_name = 'ITEM_LEVEL'
+    ) item_lang,
+    (SELECT pr_gro.inventory_item_id,
+      pr_gro.organization_id,
+      pr_gro.c_ext_attr38,
+      fvl.attribute5
+    FROM apps.ego_mtl_sy_items_ext_b pr_gro,
+      apps.ego_attr_groups_v pr_gro_gr,
+      apps.ego_data_level_b pr_gro_dl,
+      apps.fnd_flex_value_sets fst,
+      apps.fnd_flex_values fvl
+    WHERE pr_gro.attr_group_id    = pr_gro_gr.attr_group_id
+    AND pr_gro_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND pr_gro_gr.application_id  = 431
+    AND pr_gro_gr.attr_group_name = 'PR_GRO'
+    AND pr_gro.data_level_id      = pr_gro_dl.data_level_id
+    AND pr_gro_dl.attr_group_type = pr_gro_gr.attr_group_type
+    AND pr_gro_dl.data_level_name = 'ITEM_LEVEL'
+    AND fst.flex_value_set_id     = fvl.flex_value_set_id
+    AND fvl.flex_value            = pr_gro.c_ext_attr40
+    AND fst.flex_value_set_name   = 'XX_SALES_GROUP'
+    ) pr_gro,
+    (SELECT plc.inventory_item_id,
+      plc.organization_id,
+      plc.c_ext_attr1
+    FROM apps.ego_mtl_sy_items_ext_b plc,
+      apps.ego_attr_groups_v plc_gr,
+      apps.ego_data_level_b plc_dl
+    WHERE plc.attr_group_id    = plc_gr.attr_group_id
+    AND plc_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND plc_gr.application_id  = 431
+    AND plc_gr.attr_group_name = 'XXCNN_PROD_LIFE_CYCLE'
+    AND plc.data_level_id      = plc_dl.data_level_id
+    AND plc_dl.attr_group_type = plc_gr.attr_group_type
+    AND plc_dl.data_level_name = 'ITEM_LEVEL'
+    ) plc,
+    (SELECT so.inventory_item_id,
+      so.organization_id,
+      so.c_ext_attr1,
+      so.c_ext_attr2
+    FROM apps.ego_mtl_sy_items_ext_b so,
+      apps.ego_attr_groups_v so_gr,
+      apps.ego_data_level_b so_dl
+    WHERE so.attr_group_id    = so_gr.attr_group_id
+    AND so_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND so_gr.application_id  = 431
+    AND so_gr.attr_group_name = 'SALES_ORG_LC'
+    AND so.data_level_id      = so_dl.data_level_id
+    AND so_dl.attr_group_type = so_gr.attr_group_type
+    AND so_dl.data_level_name = 'ITEM_LEVEL'
+    ) so,
+    (SELECT mark.inventory_item_id,
+      mark.organization_id,
+      mark.c_ext_attr4,
+      mark.c_ext_attr7,
+      mark.c_ext_attr12,
+      mark.c_ext_attr5
+    FROM apps.ego_mtl_sy_items_ext_b mark,
+      apps.ego_attr_groups_v mark_gr,
+      apps.ego_data_level_b mark_dl
+    WHERE mark.attr_group_id    = mark_gr.attr_group_id
+    AND mark_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND mark_gr.application_id  = 431
+    AND mark_gr.attr_group_name = 'MARK'
+    AND mark.data_level_id      = mark_dl.data_level_id
+    AND mark_dl.attr_group_type = mark_gr.attr_group_type
+    AND mark_dl.data_level_name = 'ITEM_LEVEL'
+    ) mark,
+    apps.mtl_system_items_b item,
+    apps.mtl_item_revisions_b rev,
+    apps.ego_catalog_groups_v micg,
+    apps.EGO_PR_GRO_AGV mrch,
+    apps.ego_r_mark_agv item_type
+  WHERE 1                         = 1
+  AND mrch.inventory_item_id(+)   = item.inventory_item_id
+  AND mrch.organization_id(+)     = item.organization_id
+  AND item_type.inventory_item_id = item.inventory_item_id
+  AND item_type.organization_id   = item.organization_id
+  AND item.inventory_item_id      = rev.inventory_item_id
+  AND item.organization_id        = rev.organization_id
+  AND item.inventory_item_id      = item_lang.inventory_item_id(+)
+  AND item.organization_id        = item_lang.organization_id(+)
+  AND item.inventory_item_id      = pr_gro.inventory_item_id(+)
+  AND item.organization_id        = pr_gro.organization_id(+)
+  AND item.inventory_item_id      = plc.inventory_item_id(+)
+  AND item.organization_id        = plc.organization_id(+)
+  AND item.inventory_item_id      = so.inventory_item_id(+)
+  AND item.organization_id        = so.organization_id(+)
+  AND item.inventory_item_id      = mark.inventory_item_id(+)
+  AND item.organization_id        = mark.organization_id(+)
+  AND item.item_catalog_group_id  = micg.catalog_group_id
+  AND plc.c_ext_attr1            IN ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10')
+  AND pr_gro.attribute5          IN ('BIG', 'PPG')
+  AND so.c_ext_attr1             IN ('NL')
+  AND rev.revision                = '000'
+  AND mrch.MCLASS                IN ('A', 'V', 'Z')
+  AND item_type.m_item            = 'M'
+  UNION
+  SELECT item.segment1 Itemnumber,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'SALESORGANIZATION'
+    AND mdm_value           = so.c_ext_attr1
+    ) CompanyReference,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'LIFECYCLESTAGE'
+    AND mdm_value           = so.c_ext_attr2
+    ) ProductStatus,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'LANGUAGECODE'
+    AND mdm_value           = item_lang.c_ext_attr1
+    ) Locale,
+    item_lang.c_ext_attr2 Description,
+    NVL(
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'CATALOGUEGROUPNAME'
+    AND mdm_value           = micg.catalog_group
+    ), 'ItemObjectType') ObjectType,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'PRODUCTSERVICESALESTYPE'
+    AND mdm_value           = pr_gro.c_ext_attr38
+    ) ProductGroupCode,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr4, 'N')
+    ) SerialControlled,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr7, 'N')
+    ) IBaseTraceableItem,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr12, 'N')
+    ) CollectableItem,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr5, 'N')
+    ) CrossSoldCode,
+    (SELECT TRIM (pc_value) AS pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'PRIMARYUOMCODE'
+    AND mdm_value           = item.primary_uom_code
+    ) StockUOM,
+    pr_gro.attribute5 BusinessGroupCode,
+    CASE
+      WHEN micg.CATALOG_GROUP = 'SERVICE ENTITLEMENT'
+      THEN
+        (SELECT
+          (SELECT pc_value
+          FROM XXAM_XREF
+          WHERE cr_attribute_name = 'ENTITLEMENTCLASS'
+          AND mdm_value           = agv.XXCNN_ENTITLEMENTS_CATEGORY
+          )
+        FROM apps.EGO_XXCNN_SERVIC_ENT_AGV agv
+        WHERE agv.inventory_item_id = item.inventory_item_id
+        AND agv.organization_id     = item.organization_id
+        )
+    END Entitlement_Classification,
+    CASE
+      WHEN micg.CATALOG_GROUP = 'SERVICE ENTITLEMENT'
+      THEN
+        (SELECT
+          (SELECT pc_value
+          FROM XXAM_XREF
+          WHERE cr_attribute_name = 'ENTITLEMENTSUBCLASS'
+          AND mdm_value           = agv.XXCNN_SUBENTITLEMENT_CATEGORY
+          )
+        FROM apps.EGO_XXCNN_SERVIC_ENT_AGV agv
+        WHERE agv.inventory_item_id = item.inventory_item_id
+        AND agv.organization_id     = item.organization_id
+        )
+    END Entitlement_SubClassification,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'MERCHANDISECLASS'
+    AND mdm_value           = mrch.mclass
+    ) MerchandiseClass,
+    (SELECT
+      (SELECT pc_value
+      FROM XXAM_XREF
+      WHERE cr_attribute_name = 'CEMISPRODUCTGROUP'
+      AND mdm_value           = agv.CEM_N
+      )
+    FROM apps.EGO_PR_GRO_AGV agv
+    WHERE agv.inventory_item_id = item.inventory_item_id
+    AND agv.organization_id     = item.organization_id
+    ) CemisProductGroup
+  FROM
+    (SELECT item_lang.inventory_item_id,
+      item_lang.organization_id,
+      item_lang.c_ext_attr1,
+      item_lang.c_ext_attr2
+    FROM apps.ego_mtl_sy_items_ext_b item_lang,
+      apps.ego_attr_groups_v item_lang_gr,
+      apps.ego_data_level_b item_lang_dl
+    WHERE item_lang.attr_group_id    = item_lang_gr.attr_group_id
+    AND item_lang_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND item_lang_gr.application_id  = 431
+    AND item_lang_gr.attr_group_name = 'XXCNN_MERCH_NAME_FULL'
+    AND item_lang.data_level_id      = item_lang_dl.data_level_id
+    AND item_lang_dl.attr_group_type = item_lang_gr.attr_group_type
+    AND item_lang_dl.data_level_name = 'ITEM_LEVEL'
+    ) item_lang,
+    (SELECT pr_gro.inventory_item_id,
+      pr_gro.organization_id,
+      pr_gro.c_ext_attr38,
+      fvl.attribute5
+    FROM apps.ego_mtl_sy_items_ext_b pr_gro,
+      apps.ego_attr_groups_v pr_gro_gr,
+      apps.ego_data_level_b pr_gro_dl,
+      apps.fnd_flex_value_sets fst,
+      apps.fnd_flex_values fvl
+    WHERE pr_gro.attr_group_id    = pr_gro_gr.attr_group_id
+    AND pr_gro_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND pr_gro_gr.application_id  = 431
+    AND pr_gro_gr.attr_group_name = 'PR_GRO'
+    AND pr_gro.data_level_id      = pr_gro_dl.data_level_id
+    AND pr_gro_dl.attr_group_type = pr_gro_gr.attr_group_type
+    AND pr_gro_dl.data_level_name = 'ITEM_LEVEL'
+    AND fst.flex_value_set_id     = fvl.flex_value_set_id
+    AND fvl.flex_value            = pr_gro.c_ext_attr40
+    AND fst.flex_value_set_name   = 'XX_SALES_GROUP'
+    ) pr_gro,
+    (SELECT plc.inventory_item_id,
+      plc.organization_id,
+      plc.c_ext_attr1
+    FROM apps.ego_mtl_sy_items_ext_b plc,
+      apps.ego_attr_groups_v plc_gr,
+      apps.ego_data_level_b plc_dl
+    WHERE plc.attr_group_id    = plc_gr.attr_group_id
+    AND plc_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND plc_gr.application_id  = 431
+    AND plc_gr.attr_group_name = 'XXCNN_PROD_LIFE_CYCLE'
+    AND plc.data_level_id      = plc_dl.data_level_id
+    AND plc_dl.attr_group_type = plc_gr.attr_group_type
+    AND plc_dl.data_level_name = 'ITEM_LEVEL'
+    ) plc,
+    (SELECT so.inventory_item_id,
+      so.organization_id,
+      so.c_ext_attr1,
+      so.c_ext_attr2
+    FROM apps.ego_mtl_sy_items_ext_b so,
+      apps.ego_attr_groups_v so_gr,
+      apps.ego_data_level_b so_dl
+    WHERE so.attr_group_id    = so_gr.attr_group_id
+    AND so_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND so_gr.application_id  = 431
+    AND so_gr.attr_group_name = 'SALES_ORG_LC'
+    AND so.data_level_id      = so_dl.data_level_id
+    AND so_dl.attr_group_type = so_gr.attr_group_type
+    AND so_dl.data_level_name = 'ITEM_LEVEL'
+    ) so,
+    (SELECT mark.inventory_item_id,
+      mark.organization_id,
+      mark.c_ext_attr4,
+      mark.c_ext_attr7,
+      mark.c_ext_attr12,
+      mark.c_ext_attr5
+    FROM apps.ego_mtl_sy_items_ext_b mark,
+      apps.ego_attr_groups_v mark_gr,
+      apps.ego_data_level_b mark_dl
+    WHERE mark.attr_group_id    = mark_gr.attr_group_id
+    AND mark_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND mark_gr.application_id  = 431
+    AND mark_gr.attr_group_name = 'MARK'
+    AND mark.data_level_id      = mark_dl.data_level_id
+    AND mark_dl.attr_group_type = mark_gr.attr_group_type
+    AND mark_dl.data_level_name = 'ITEM_LEVEL'
+    ) mark,
+    apps.mtl_system_items_b item,
+    apps.mtl_item_revisions_b rev,
+    apps.ego_catalog_groups_v micg,
+    apps.EGO_PR_GRO_AGV mrch,
+    apps.ego_r_mark_agv item_type
+  WHERE 1                         = 1
+  AND mrch.inventory_item_id(+)   = item.inventory_item_id
+  AND mrch.organization_id(+)     = item.organization_id
+  AND item_type.inventory_item_id = item.inventory_item_id
+  AND item_type.organization_id   = item.organization_id
+  AND item.inventory_item_id      = rev.inventory_item_id
+  AND item.organization_id        = rev.organization_id
+  AND item.inventory_item_id      = item_lang.inventory_item_id(+)
+  AND item.organization_id        = item_lang.organization_id(+)
+  AND item.inventory_item_id      = pr_gro.inventory_item_id(+)
+  AND item.organization_id        = pr_gro.organization_id(+)
+  AND item.inventory_item_id      = plc.inventory_item_id(+)
+  AND item.organization_id        = plc.organization_id(+)
+  AND item.inventory_item_id      = so.inventory_item_id(+)
+  AND item.organization_id        = so.organization_id(+)
+  AND item.inventory_item_id      = mark.inventory_item_id(+)
+  AND item.organization_id        = mark.organization_id(+)
+  AND item.item_catalog_group_id  = micg.catalog_group_id
+  AND plc.c_ext_attr1            IN ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10')
+  AND pr_gro.attribute5          IN ('BIG', 'PPG')
+  AND so.c_ext_attr1             IN ('NL')
+  AND rev.revision                = '000'
+  AND mrch.MCLASS                IN ('A', 'V', 'Z')
+  AND item_type.m_item            = 'M'
+  UNION
+  SELECT item.segment1 Itemnumber,
+    'MASTER' CompanyReference,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'LIFECYCLESTAGE'
+    AND mdm_value           = plc.c_ext_attr1
+    ) ProductStatus,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'LANGUAGECODE'
+    AND mdm_value           = item_lang.c_ext_attr1
+    ) Locale,
+    item_lang.c_ext_attr2 Description,
+    NVL(
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'CATALOGUEGROUPNAME'
+    AND mdm_value           = micg.catalog_group
+    ), 'ItemObjectType') ObjectType,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'PRODUCTSERVICESALESTYPE'
+    AND mdm_value           = pr_gro.c_ext_attr38
+    ) ProductGroupCode,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr4, 'N')
+    ) SerialControlled,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr7, 'N')
+    ) IBaseTraceableItem,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr12, 'N')
+    ) CollectableItem,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr5, 'N')
+    ) CrossSoldCode,
+    (SELECT TRIM (pc_value) AS pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'PRIMARYUOMCODE'
+    AND mdm_value           = item.primary_uom_code
+    ) StockUOM,
+    pr_gro.attribute5 BusinessGroupCode,
+    CASE
+      WHEN micg.CATALOG_GROUP = 'SERVICE ENTITLEMENT'
+      THEN
+        (SELECT
+          (SELECT pc_value
+          FROM XXAM_XREF
+          WHERE cr_attribute_name = 'ENTITLEMENTCLASS'
+          AND mdm_value           = agv.XXCNN_ENTITLEMENTS_CATEGORY
+          )
+        FROM apps.EGO_XXCNN_SERVIC_ENT_AGV agv
+        WHERE agv.inventory_item_id = item.inventory_item_id
+        AND agv.organization_id     = item.organization_id
+        )
+    END Entitlement_Classification,
+    CASE
+      WHEN micg.CATALOG_GROUP = 'SERVICE ENTITLEMENT'
+      THEN
+        (SELECT
+          (SELECT pc_value
+          FROM XXAM_XREF
+          WHERE cr_attribute_name = 'ENTITLEMENTSUBCLASS'
+          AND mdm_value           = agv.XXCNN_SUBENTITLEMENT_CATEGORY
+          )
+        FROM apps.EGO_XXCNN_SERVIC_ENT_AGV agv
+        WHERE agv.inventory_item_id = item.inventory_item_id
+        AND agv.organization_id     = item.organization_id
+        )
+    END Entitlement_SubClassification,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'MERCHANDISECLASS'
+    AND mdm_value           = mrch.mclass
+    ) MerchandiseClass,
+    (SELECT
+      (SELECT pc_value
+      FROM XXAM_XREF
+      WHERE cr_attribute_name = 'CEMISPRODUCTGROUP'
+      AND mdm_value           = agv.CEM_N
+      )
+    FROM apps.EGO_PR_GRO_AGV agv
+    WHERE agv.inventory_item_id = item.inventory_item_id
+    AND agv.organization_id     = item.organization_id
+    ) CemisProductGroup
+  FROM
+    (SELECT item_lang.inventory_item_id,
+      item_lang.organization_id,
+      item_lang.c_ext_attr1,
+      item_lang.c_ext_attr2
+    FROM apps.ego_mtl_sy_items_ext_b item_lang,
+      apps.ego_attr_groups_v item_lang_gr,
+      apps.ego_data_level_b item_lang_dl
+    WHERE item_lang.attr_group_id    = item_lang_gr.attr_group_id
+    AND item_lang_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND item_lang_gr.application_id  = 431
+    AND item_lang_gr.attr_group_name = 'XXCNN_MERCH_NAME_FULL'
+    AND item_lang.data_level_id      = item_lang_dl.data_level_id
+    AND item_lang_dl.attr_group_type = item_lang_gr.attr_group_type
+    AND item_lang_dl.data_level_name = 'ITEM_LEVEL'
+    ) item_lang,
+    (SELECT pr_gro.inventory_item_id,
+      pr_gro.organization_id,
+      pr_gro.c_ext_attr38,
+      fvl.attribute5
+    FROM apps.ego_mtl_sy_items_ext_b pr_gro,
+      apps.ego_attr_groups_v pr_gro_gr,
+      apps.ego_data_level_b pr_gro_dl,
+      apps.fnd_flex_value_sets fst,
+      apps.fnd_flex_values fvl
+    WHERE pr_gro.attr_group_id    = pr_gro_gr.attr_group_id
+    AND pr_gro_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND pr_gro_gr.application_id  = 431
+    AND pr_gro_gr.attr_group_name = 'PR_GRO'
+    AND pr_gro.data_level_id      = pr_gro_dl.data_level_id
+    AND pr_gro_dl.attr_group_type = pr_gro_gr.attr_group_type
+    AND pr_gro_dl.data_level_name = 'ITEM_LEVEL'
+    AND fst.flex_value_set_id     = fvl.flex_value_set_id
+    AND fvl.flex_value            = pr_gro.c_ext_attr40
+    AND fst.flex_value_set_name   = 'XX_SALES_GROUP'
+    ) pr_gro,
+    (SELECT plc.inventory_item_id,
+      plc.organization_id,
+      plc.c_ext_attr1
+    FROM apps.ego_mtl_sy_items_ext_b plc,
+      apps.ego_attr_groups_v plc_gr,
+      apps.ego_data_level_b plc_dl
+    WHERE plc.attr_group_id    = plc_gr.attr_group_id
+    AND plc_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND plc_gr.application_id  = 431
+    AND plc_gr.attr_group_name = 'XXCNN_PROD_LIFE_CYCLE'
+    AND plc.data_level_id      = plc_dl.data_level_id
+    AND plc_dl.attr_group_type = plc_gr.attr_group_type
+    AND plc_dl.data_level_name = 'ITEM_LEVEL'
+    ) plc,
+    (SELECT so.inventory_item_id,
+      so.organization_id,
+      so.c_ext_attr1,
+      so.c_ext_attr2
+    FROM apps.ego_mtl_sy_items_ext_b so,
+      apps.ego_attr_groups_v so_gr,
+      apps.ego_data_level_b so_dl
+    WHERE so.attr_group_id    = so_gr.attr_group_id
+    AND so_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND so_gr.application_id  = 431
+    AND so_gr.attr_group_name = 'SALES_ORG_LC'
+    AND so.data_level_id      = so_dl.data_level_id
+    AND so_dl.attr_group_type = so_gr.attr_group_type
+    AND so_dl.data_level_name = 'ITEM_LEVEL'
+    ) so,
+    (SELECT mark.inventory_item_id,
+      mark.organization_id,
+      mark.c_ext_attr4,
+      mark.c_ext_attr7,
+      mark.c_ext_attr12,
+      mark.c_ext_attr5
+    FROM apps.ego_mtl_sy_items_ext_b mark,
+      apps.ego_attr_groups_v mark_gr,
+      apps.ego_data_level_b mark_dl
+    WHERE mark.attr_group_id    = mark_gr.attr_group_id
+    AND mark_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND mark_gr.application_id  = 431
+    AND mark_gr.attr_group_name = 'MARK'
+    AND mark.data_level_id      = mark_dl.data_level_id
+    AND mark_dl.attr_group_type = mark_gr.attr_group_type
+    AND mark_dl.data_level_name = 'ITEM_LEVEL'
+    ) mark,
+    apps.mtl_system_items_b item,
+    apps.mtl_item_revisions_b rev,
+    apps.ego_catalog_groups_v micg,
+    apps.EGO_PR_GRO_AGV mrch,
+    apps.ego_r_mark_agv item_type
+  WHERE 1                         = 1
+  AND mrch.inventory_item_id(+)   = item.inventory_item_id
+  AND mrch.organization_id(+)     = item.organization_id
+  AND item_type.inventory_item_id = item.inventory_item_id
+  AND item_type.organization_id   = item.organization_id
+  AND item.inventory_item_id      = rev.inventory_item_id
+  AND item.organization_id        = rev.organization_id
+  AND item.inventory_item_id      = item_lang.inventory_item_id(+)
+  AND item.organization_id        = item_lang.organization_id(+)
+  AND item.inventory_item_id      = pr_gro.inventory_item_id(+)
+  AND item.organization_id        = pr_gro.organization_id(+)
+  AND item.inventory_item_id      = plc.inventory_item_id(+)
+  AND item.organization_id        = plc.organization_id(+)
+  AND item.inventory_item_id      = so.inventory_item_id(+)
+  AND item.organization_id        = so.organization_id(+)
+  AND item.inventory_item_id      = mark.inventory_item_id(+)
+  AND item.organization_id        = mark.organization_id(+)
+  AND item.item_catalog_group_id  = micg.catalog_group_id
+  AND plc.c_ext_attr1            IN ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10')
+  AND pr_gro.attribute5          IN ('CIG')
+  AND so.c_ext_attr1             IN ('NL')
+  AND rev.revision                = '000'
+  AND mark.c_ext_attr5            = 'Y'
+  AND mrch.MCLASS                IN ('A', 'V', 'Z')
+  AND item_type.m_item            = 'M'
+  UNION
+  SELECT item.segment1 Itemnumber,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'SALESORGANIZATION'
+    AND mdm_value           = so.c_ext_attr1
+    ) CompanyReference,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'LIFECYCLESTAGE'
+    AND mdm_value           = so.c_ext_attr2
+    ) ProductStatus,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'LANGUAGECODE'
+    AND mdm_value           = item_lang.c_ext_attr1
+    ) Locale,
+    item_lang.c_ext_attr2 Description,
+    NVL(
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'CATALOGUEGROUPNAME'
+    AND mdm_value           = micg.catalog_group
+    ), 'ItemObjectType') ObjectType,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'PRODUCTSERVICESALESTYPE'
+    AND mdm_value           = pr_gro.c_ext_attr38
+    ) ProductGroupCode,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr4, 'N')
+    ) SerialControlled,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr7, 'N')
+    ) IBaseTraceableItem,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr12, 'N')
+    ) CollectableItem,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'BOOLEAN'
+    AND mdm_value           = NVL (mark.c_ext_attr5, 'N')
+    ) CrossSoldCode,
+    (SELECT TRIM (pc_value) AS pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'PRIMARYUOMCODE'
+    AND mdm_value           = item.primary_uom_code
+    ) StockUOM,
+    pr_gro.attribute5 BusinessGroupCode,
+    CASE
+      WHEN micg.CATALOG_GROUP = 'SERVICE ENTITLEMENT'
+      THEN
+        (SELECT
+          (SELECT pc_value
+          FROM XXAM_XREF
+          WHERE cr_attribute_name = 'ENTITLEMENTCLASS'
+          AND mdm_value           = agv.XXCNN_ENTITLEMENTS_CATEGORY
+          )
+        FROM apps.EGO_XXCNN_SERVIC_ENT_AGV agv
+        WHERE agv.inventory_item_id = item.inventory_item_id
+        AND agv.organization_id     = item.organization_id
+        )
+    END Entitlement_Classification,
+    CASE
+      WHEN micg.CATALOG_GROUP = 'SERVICE ENTITLEMENT'
+      THEN
+        (SELECT
+          (SELECT pc_value
+          FROM XXAM_XREF
+          WHERE cr_attribute_name = 'ENTITLEMENTSUBCLASS'
+          AND mdm_value           = agv.XXCNN_SUBENTITLEMENT_CATEGORY
+          )
+        FROM apps.EGO_XXCNN_SERVIC_ENT_AGV agv
+        WHERE agv.inventory_item_id = item.inventory_item_id
+        AND agv.organization_id     = item.organization_id
+        )
+    END Entitlement_SubClassification,
+    (SELECT pc_value
+    FROM XXAM_XREF
+    WHERE cr_attribute_name = 'MERCHANDISECLASS'
+    AND mdm_value           = mrch.mclass
+    ) MerchandiseClass,
+    (SELECT
+      (SELECT pc_value
+      FROM XXAM_XREF
+      WHERE cr_attribute_name = 'CEMISPRODUCTGROUP'
+      AND mdm_value           = agv.CEM_N
+      )
+    FROM apps.EGO_PR_GRO_AGV agv
+    WHERE agv.inventory_item_id = item.inventory_item_id
+    AND agv.organization_id     = item.organization_id
+    ) CemisProductGroup
+  FROM
+    (SELECT item_lang.inventory_item_id,
+      item_lang.organization_id,
+      item_lang.c_ext_attr1,
+      item_lang.c_ext_attr2
+    FROM apps.ego_mtl_sy_items_ext_b item_lang,
+      apps.ego_attr_groups_v item_lang_gr,
+      apps.ego_data_level_b item_lang_dl
+    WHERE item_lang.attr_group_id    = item_lang_gr.attr_group_id
+    AND item_lang_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND item_lang_gr.application_id  = 431
+    AND item_lang_gr.attr_group_name = 'XXCNN_MERCH_NAME_FULL'
+    AND item_lang.data_level_id      = item_lang_dl.data_level_id
+    AND item_lang_dl.attr_group_type = item_lang_gr.attr_group_type
+    AND item_lang_dl.data_level_name = 'ITEM_LEVEL'
+    ) item_lang,
+    (SELECT pr_gro.inventory_item_id,
+      pr_gro.organization_id,
+      pr_gro.c_ext_attr38,
+      fvl.attribute5
+    FROM apps.ego_mtl_sy_items_ext_b pr_gro,
+      apps.ego_attr_groups_v pr_gro_gr,
+      apps.ego_data_level_b pr_gro_dl,
+      apps.fnd_flex_value_sets fst,
+      apps.fnd_flex_values fvl
+    WHERE pr_gro.attr_group_id    = pr_gro_gr.attr_group_id
+    AND pr_gro_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND pr_gro_gr.application_id  = 431
+    AND pr_gro_gr.attr_group_name = 'PR_GRO'
+    AND pr_gro.data_level_id      = pr_gro_dl.data_level_id
+    AND pr_gro_dl.attr_group_type = pr_gro_gr.attr_group_type
+    AND pr_gro_dl.data_level_name = 'ITEM_LEVEL'
+    AND fst.flex_value_set_id     = fvl.flex_value_set_id
+    AND fvl.flex_value            = pr_gro.c_ext_attr40
+    AND fst.flex_value_set_name   = 'XX_SALES_GROUP'
+    ) pr_gro,
+    (SELECT plc.inventory_item_id,
+      plc.organization_id,
+      plc.c_ext_attr1
+    FROM apps.ego_mtl_sy_items_ext_b plc,
+      apps.ego_attr_groups_v plc_gr,
+      apps.ego_data_level_b plc_dl
+    WHERE plc.attr_group_id    = plc_gr.attr_group_id
+    AND plc_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND plc_gr.application_id  = 431
+    AND plc_gr.attr_group_name = 'XXCNN_PROD_LIFE_CYCLE'
+    AND plc.data_level_id      = plc_dl.data_level_id
+    AND plc_dl.attr_group_type = plc_gr.attr_group_type
+    AND plc_dl.data_level_name = 'ITEM_LEVEL'
+    ) plc,
+    (SELECT so.inventory_item_id,
+      so.organization_id,
+      so.c_ext_attr1,
+      so.c_ext_attr2
+    FROM apps.ego_mtl_sy_items_ext_b so,
+      apps.ego_attr_groups_v so_gr,
+      apps.ego_data_level_b so_dl
+    WHERE so.attr_group_id    = so_gr.attr_group_id
+    AND so_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND so_gr.application_id  = 431
+    AND so_gr.attr_group_name = 'SALES_ORG_LC'
+    AND so.data_level_id      = so_dl.data_level_id
+    AND so_dl.attr_group_type = so_gr.attr_group_type
+    AND so_dl.data_level_name = 'ITEM_LEVEL'
+    ) so,
+    (SELECT mark.inventory_item_id,
+      mark.organization_id,
+      mark.c_ext_attr4,
+      mark.c_ext_attr7,
+      mark.c_ext_attr12,
+      mark.c_ext_attr5
+    FROM apps.ego_mtl_sy_items_ext_b mark,
+      apps.ego_attr_groups_v mark_gr,
+      apps.ego_data_level_b mark_dl
+    WHERE mark.attr_group_id    = mark_gr.attr_group_id
+    AND mark_gr.attr_group_type = 'EGO_ITEMMGMT_GROUP'
+    AND mark_gr.application_id  = 431
+    AND mark_gr.attr_group_name = 'MARK'
+    AND mark.data_level_id      = mark_dl.data_level_id
+    AND mark_dl.attr_group_type = mark_gr.attr_group_type
+    AND mark_dl.data_level_name = 'ITEM_LEVEL'
+    ) mark,
+    apps.mtl_system_items_b item,
+    apps.mtl_item_revisions_b rev,
+    apps.ego_catalog_groups_v micg,
+    apps.EGO_PR_GRO_AGV mrch,
+    apps.ego_r_mark_agv item_type
+  WHERE 1                         = 1
+  AND mrch.inventory_item_id(+)   = item.inventory_item_id
+  AND mrch.organization_id(+)     = item.organization_id
+  AND item_type.inventory_item_id = item.inventory_item_id
+  AND item_type.organization_id   = item.organization_id
+  AND item.inventory_item_id      = rev.inventory_item_id
+  AND item.organization_id        = rev.organization_id
+  AND item.inventory_item_id      = item_lang.inventory_item_id(+)
+  AND item.organization_id        = item_lang.organization_id(+)
+  AND item.inventory_item_id      = pr_gro.inventory_item_id(+)
+  AND item.organization_id        = pr_gro.organization_id(+)
+  AND item.inventory_item_id      = plc.inventory_item_id(+)
+  AND item.organization_id        = plc.organization_id(+)
+  AND item.inventory_item_id      = so.inventory_item_id(+)
+  AND item.organization_id        = so.organization_id(+)
+  AND item.inventory_item_id      = mark.inventory_item_id(+)
+  AND item.organization_id        = mark.organization_id(+)
+  AND item.item_catalog_group_id  = micg.catalog_group_id
+  AND plc.c_ext_attr1            IN ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10')
+  AND pr_gro.attribute5          IN ('CIG')
+  AND so.c_ext_attr1             IN ('NL')
+  AND rev.revision                = '000'
+  AND mark.c_ext_attr5            = 'Y'
+  AND mrch.MCLASS                IN ('A', 'V', 'Z')
+  AND item_type.m_item            = 'M'
+  )
+WHERE  1=1
+and (LOCALE = 'en-GB' or LOCALE is null)
